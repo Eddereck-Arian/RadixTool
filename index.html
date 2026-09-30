@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radix — All-in-One Base Calculator</title>
+<style>
+  :root {
+    --bg: #F5F6F4;
+    --grid: rgba(20,33,61,0.06);
+    --surface: #FFFFFF;
+    --surface-2: #EEF0EB;
+    --ink: #14213D;
+    --ink-soft: #57607a;
+    --ink-faint: #8891a6;
+    --border: #DBDFD5;
+    --accent: #C8102E;
+    --accent-strong: #9C0B23;
+    --accent-ink: #FFFFFF;
+    --gold: #9C6B0C;
+    --gold-bg: #FBF0DA;
+    --danger: #A8281E;
+    --danger-bg: #FBEAE8;
+    --shadow: 0 16px 40px -20px rgba(20,33,61,0.35);
+    --radius: 14px;
+    --font-serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'URW Palladio L', serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Code', 'Roboto Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  html[data-theme="dark"] {
+    --bg: #0E1620;
+    --grid: rgba(231,236,242,0.055);
+    --surface: #16212C;
+    --surface-2: #1C2A37;
+    --ink: #E9EEF4;
+    --ink-soft: #A7B4C6;
+    --ink-faint: #71809A;
+    --border: #2A3B4C;
+    --accent: #FF4D63;
+    --accent-strong: #FF7186;
+    --accent-ink: #3A0510;
+    --gold: #F2BB4E;
+    --gold-bg: #2B2313;
+    --danger: #FF7A70;
+    --danger-bg: #331716;
+    --shadow: 0 16px 40px -18px rgba(0,0,0,0.6);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background-color: var(--bg);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 26px 26px;
+    padding: 48px 20px 72px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+
+  .page { max-width: 700px; margin: 0 auto; }
+
+  /* ---------- Header ---------- */
+  .masthead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .wordmark {
+    font-family: var(--font-serif);
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .wordmark .formula {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 7px;
+    letter-spacing: 0;
+  }
+  .tagline { margin: 4px 0 0; color: var(--ink-soft); font-size: 0.95rem; }
+  .theme-toggle {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    font-size: 1.05rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
+
+  /* ---------- Card ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .tab {
+    flex: 1;
+    padding: 16px 12px;
+    border: none;
+    background: transparent;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink-faint);
+    cursor: pointer;
+    position: relative;
+  }
+  .tab[aria-selected="true"] { color: var(--ink); }
+  .tab[aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    left: 14px; right: 14px; bottom: -1px;
+    height: 3px;
+    background: var(--accent);
+    border-radius: 3px 3px 0 0;
+  }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .panel { padding: 28px; }
+  .panel[hidden] { display: none; }
+
+  /* ---------- Form ---------- */
+  fieldset { border: none; margin: 0; padding: 0; }
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 130px 130px;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .field-row.arith { grid-template-columns: 1fr 96px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    text-transform: none;
+  }
+  input, select {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--bg);
+    color: var(--ink);
+    width: 100%;
+  }
+  select { font-family: var(--font-sans); }
+  input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+  .op-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .op-field { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+
+  .field-row.compl { grid-template-columns: 1fr 100px 130px; }
+  .panel-intro { margin: 0 0 18px; color: var(--ink-soft); font-size: 0.9rem; }
+
+  .compl-results {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 22px;
+  }
+  .compl-results[hidden] { display: none; }
+  .compl-result-card {
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    min-width: 0;
+  }
+  .compl-result-card .result-value { font-size: 1.35rem; word-break: break-all; }
+  .compl-result-card .result-sub { margin-top: 4px; }
+
+  .go-btn {
+    margin-top: 6px;
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 9px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family: var(--font-sans);
+    font-size: 0.98rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .go-btn:hover { background: var(--accent-strong); }
+  .go-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  @media (max-width: 480px) {
+    .field-row { grid-template-columns: 1fr; }
+    .field-row.arith { grid-template-columns: 1fr; }
+    .field-row.compl { grid-template-columns: 1fr; }
+    .compl-results { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- Error ---------- */
+  .error-box {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 9px;
+    background: var(--danger-bg);
+    color: var(--danger);
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1px solid var(--danger);
+  }
+  .error-box[hidden] { display: none; }
+
+  /* ---------- Result ---------- */
+  .result {
+    margin-top: 22px;
+    padding: 18px 20px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+  .result[hidden] { display: none; }
+  .result-label { font-size: 0.78rem; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; }
+  .result-value {
+    font-family: var(--font-mono);
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--accent);
+    word-break: break-all;
+    line-height: 1.3;
+  }
+  .result-value .base-tag {
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin-left: 4px;
+  }
+  .result-sub { margin-top: 6px; font-size: 0.85rem; color: var(--ink-soft); font-family: var(--font-mono); }
+
+  /* ---------- Steps ---------- */
+  .steps-heading {
+    margin: 26px 0 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ink-faint);
+  }
+  .step-list { list-style: none; margin: 0; padding: 0; }
+  .step {
+    position: relative;
+    padding: 0 0 22px 34px;
+    border-left: 2px solid var(--border);
+    margin-left: 13px;
+  }
+  .step:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .step::before {
+    content: attr(data-n);
+    position: absolute;
+    left: -13px; top: 0;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-title { font-weight: 700; font-size: 0.92rem; margin-bottom: 6px; }
+  .step-body { font-size: 0.88rem; color: var(--ink-soft); }
+  .expr {
+    font-family: var(--font-mono);
+    font-size: 0.86rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 6px;
+    overflow-x: auto;
+    color: var(--ink);
+  }
+  .expr .eq { color: var(--gold); font-weight: 700; }
+  table.division {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+  }
+  table.division th {
+    text-align: left;
+    color: var(--ink-faint);
+    font-weight: 600;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem;
+  }
+  table.division td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--ink);
+  }
+  table.division td.digit-cell {
+    color: var(--gold);
+    font-weight: 700;
+    background: var(--gold-bg);
+    border-radius: 6px;
+  }
+  .readup { margin-top: 8px; font-size: 0.84rem; color: var(--ink-soft); }
+  .final-line {
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  footer {
+    max-width: 700px;
+    margin: 24px auto 0;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--ink-faint);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="masthead">
+    <div>
+      <h1 class="wordmark">Radix <span class="formula">&Sigma; d&middot;b<sup>i</sup></span></h1>
+      <p class="tagline">Multifunctional radix tool.</p>
+    </div>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">&#9788;</button>
+  </div>
+
+  <div class="card">
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tabBtnConvert" role="tab" aria-selected="true" aria-controls="panelConvert" type="button">Radix Converter</button>
+      <button class="tab" id="tabBtnArith" role="tab" aria-selected="false" aria-controls="panelArith" type="button">Mixed Radix Operations</button>
+      <button class="tab" id="tabBtnCompl" role="tab" aria-selected="false" aria-controls="panelCompl" type="button">Complements</button>
+    </div>
+
+    <!-- ===================== CONVERTER PANEL ===================== -->
+    <section class="panel" id="panelConvert" role="tabpanel" aria-labelledby="tabBtnConvert">
+      <form id="convertForm" novalidate>
+        <fieldset>
+          <div class="field-row">
+            <div class="field">
+              <label for="srcNumber">Source number</label>
+              <input id="srcNumber" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 101.101" value="255.5">
+            </div>
+            <div class="field">
+              <label for="srcBase">Source base</label>
+              <input id="srcBase" type="number" min="2" max="36" value="10">
+            </div>
+            <div class="field">
+              <label for="tgtBase">Target base</label>
+              <input id="tgtBase" type="number" min="2" max="36" value="16">
+            </div>
+          </div>
+        </fieldset>
+        <button class="go-btn" type="submit">Convert</button>
+        <div class="error-box" id="convertError" hidden role="alert"></div>
+      </form>
+
+      <div class="result" id="convertResult" hidden>
+        <div class="result-label">Result</div>
+        <div class="result-value" id="convertResultValue"></div>
+      </div>
+
+      <div id="convertSteps"></div>
+    </section>
+
+    <!-- ===================== ARITHMETIC PANEL ===================== -->
+    <section class="panel" id="panelArith" role="tabpanel" aria-labelledby="tabBtnArith" hidden>
+      <form id="arithForm" novalidate>
+        <fieldset>
+          <div class="field-row arith">
+            <div class="field">
+              <label for="n1">First number (N1)</label>
+              <input id="n1" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 1010" value="1010">
+            </div>
+            <div class="field">
+              <label for="b1">Base</label>
+              <input id="b1" type="number" min="2" max="36" value="2">
+            </div>
+          </div>
+
+          <div class="op-row">
+            <div class="op-field">
+              <label for="operator">Operator</label>
+              <select id="operator">
+                <option value="+">+ &nbsp;Addition</option>
+                <option value="-">&minus; &nbsp;Subtraction</option>
+                <option value="*">&times; &nbsp;Multiplication</option>
+                <option value="/">&divide; &nbsp;Division</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row arith">
+            <div class="field">
+              <label for="n2">Second number (N2)</label>
+              <input id="n2" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. A.8" value="A.8">
+            </div>
+            <div class="field">
+              <label for="b2">Base</label>
+              <input id="b2" type="number" min="2" max="36" value="16">
+            </div>
+          </div>
+        </fieldset>
+        <button class="go-btn" type="submit">Calculate</button>
+        <div class="error-box" id="arithError" hidden role="alert"></div>
+      </form>
+
+      <div class="result" id="arithResult" hidden>
+        <div class="result-label">Result</div>
+        <div class="result-value" id="arithResultValue"></div>
+        <div class="result-sub" id="arithResultSub"></div>
+      </div>
+
+      <div id="arithSteps"></div>
+    </section>
+
+    <!-- ===================== COMPLEMENTS PANEL ===================== -->
+    <section class="panel" id="panelCompl" role="tabpanel" aria-labelledby="tabBtnCompl" hidden>
+      <p class="panel-intro">Find the diminished radix (r&minus;1)'s and radix r's complements of a number &mdash; integer or fractional &mdash; the standard technique for representing negative values using only non-negative digit patterns in a fixed digit width.</p>
+      <form id="complForm" novalidate>
+        <fieldset>
+          <div class="field-row compl">
+            <div class="field">
+              <label for="complNumber">Number (magnitude)</label>
+              <input id="complNumber" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 246.32" value="246.32">
+            </div>
+            <div class="field">
+              <label for="complBase">Base</label>
+              <input id="complBase" type="number" min="2" max="36" value="10">
+            </div>
+            <div class="field">
+              <label for="complWidth">Integer digit width</label>
+              <input id="complWidth" type="number" min="1" placeholder="auto" value="">
+            </div>
+          </div>
+        </fieldset>
+        <button class="go-btn" type="submit">Find Complements</button>
+        <div class="error-box" id="complError" hidden role="alert"></div>
+      </form>
+
+      <div class="compl-results" id="complResult" hidden>
+        <div class="compl-result-card">
+          <div class="result-label" id="complDiminishedLabel">(r&minus;1)'s complement</div>
+          <div class="result-value" id="complDiminishedValue"></div>
+          <div class="result-sub" id="complDiminishedSub"></div>
+        </div>
+        <div class="compl-result-card">
+          <div class="result-label" id="complRadixLabel">r's complement</div>
+          <div class="result-value" id="complRadixValue"></div>
+          <div class="result-sub" id="complRadixSub"></div>
+        </div>
+      </div>
+
+      <div id="complSteps"></div>
+    </section>
+  </div>
+
+  <footer>Supports bases 2&ndash;36 &middot; digits 0&ndash;9 then A&ndash;Z &middot; fractional parts, e.g. 101.101 &middot; r's and (r&minus;1)'s complements, integer or fractional.<br>
+    Abellanida - Bayani - Blanco - Cruz - Tolentino <br> TUPM-BSECE-3B
+    </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============== THEME ============== */
+  var html = document.documentElement;
+  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+  var themeBtn = document.getElementById('themeToggle');
+  function syncThemeBtn() {
+    themeBtn.innerHTML = html.getAttribute('data-theme') === 'dark' ? '&#9789;' : '&#9788;';
+  }
+  syncThemeBtn();
+  themeBtn.addEventListener('click', function () {
+    html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    syncThemeBtn();
+  });
+
+  /* ============== TABS ============== */
+  var tabConvert = document.getElementById('tabBtnConvert');
+  var tabArith = document.getElementById('tabBtnArith');
+  var tabCompl = document.getElementById('tabBtnCompl');
+  var panelConvert = document.getElementById('panelConvert');
+  var panelArith = document.getElementById('panelArith');
+  var panelCompl = document.getElementById('panelCompl');
+  function activate(which) {
+    var isConvert = which === 'convert';
+    var isArith = which === 'arith';
+    var isCompl = which === 'compl';
+    tabConvert.setAttribute('aria-selected', String(isConvert));
+    tabArith.setAttribute('aria-selected', String(isArith));
+    tabCompl.setAttribute('aria-selected', String(isCompl));
+    panelConvert.hidden = !isConvert;
+    panelArith.hidden = !isArith;
+    panelCompl.hidden = !isCompl;
+  }
+  tabConvert.addEventListener('click', function () { activate('convert'); });
+  tabArith.addEventListener('click', function () { activate('arith'); });
+  tabCompl.addEventListener('click', function () { activate('compl'); });
+
+  /* ================================================================================
+     CORE RADIX MATH ENGINE
+
+     Everything here works with BigInt, never JS `Number`, so there is no floating-
+     point rounding anywhere in the pipeline — results are exact right up until a
+     non-terminating fraction forces a deliberate, clearly-marked truncation.
+
+     The engine treats every number (integer or fractional, base 10 or not) as an
+     exact rational value: a BigInt numerator over a BigInt denominator. An integer
+     is just a rational with denominator 1. This one representation is what lets the
+     same conversion/arithmetic code paths handle whole numbers and fractions
+     uniformly instead of needing separate logic for each.
+     ================================================================================ */
+
+  // Digit alphabet: index == digit value, so DIGITS[5] === '5' and DIGITS[15] === 'f' (hex F).
+  // Supports every base from 2 up to 36 (10 numerals + 26 letters).
+  var DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
+
+  // Unicode superscript characters used to render exponents in the positional-expansion
+  // expressions (e.g. "2³"), purely for display of the math — not part of the computation.
+  var SUPER = { '0':'\u2070','1':'\u00b9','2':'\u00b2','3':'\u00b3','4':'\u2074','5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079' };
+  var SUPER_MINUS = '\u207b';
+
+  // Fractional expansions (repeated multiplication) can run forever for a value like
+  // 1/3. This caps how many fractional digits any conversion will compute before it
+  // stops and marks the result as truncated, so the app never hangs on a repeating value.
+  var MAX_FRAC_DIGITS = 10;
+
+  function toSuper(n) {
+    return String(n).split('').map(function (c) { return SUPER[c] || c; }).join('');
+  }
+  function toSuperSigned(n) {
+    return n < 0 ? SUPER_MINUS + toSuper(-n) : toSuper(n);
+  }
+
+  // Maps a single character to its numeric value in the DIGITS alphabet ('a'/'A' -> 10, etc.),
+  // or -1 if the character isn't a valid digit in any supported base. This is the single
+  // point every validation and every base conversion routes through.
+  function digitValue(ch) { return DIGITS.indexOf(ch.toLowerCase()); }
+  function upper(s) { return s.toUpperCase(); }
+
+  // Formats a BigInt with thousands separators for readability in the step breakdown
+  // (e.g. 20500n -> "20,500"). Purely cosmetic, no effect on the underlying math.
+  function fmtInt(big) {
+    var neg = big < 0n;
+    var s = (neg ? -big : big).toString();
+    s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (neg ? '-' : '') + s;
+  }
+
+  function bigAbs(x) { return x < 0n ? -x : x; }
+
+  // Euclidean algorithm (BigInt): repeatedly replace (a, b) with (b, a mod b) until
+  // b hits 0 — whatever's left in `a` is the greatest common divisor. Used to keep
+  // every rational value in lowest terms so numerators/denominators don't balloon
+  // across a chain of conversions or arithmetic operations.
+  function gcdBig(a, b) {
+    a = bigAbs(a); b = bigAbs(b);
+    while (b) { var t = a % b; a = b; b = t; }
+    return a === 0n ? 1n : a;
+  }
+
+  // Reduces a num/den pair to lowest terms via gcdBig, and normalizes sign so the
+  // denominator is always positive and the numerator alone carries the sign
+  // (e.g. -3/4 rather than 3/-4). This is the canonical form every rational value
+  // in the app is kept in, so two equal values are always represented identically.
+  function reduceFrac(num, den) {
+    var g = gcdBig(num, den);
+    if (g > 1n) { num = num / g; den = den / g; }
+    if (den < 0n) { den = -den; num = -num; }
+    return { num: num, den: den };
+  }
+
+  // Confirms a base field holds a whole number in the supported 2–36 range before
+  // any conversion math touches it. Every entry point (both tabs) calls this first.
+  function validateBase(raw, label) {
+    var n = Number(raw);
+    if (raw === '' || raw === null || !Number.isInteger(n) || n < 2 || n > 36) {
+      throw new Error(label + ' must be a whole number between 2 and 36.');
+    }
+    return n;
+  }
+
+  /* Parses a raw text field into { intDigits, fracDigits, negative } and validates every
+     digit against `base` — this is the gateway all user input passes through before any
+     arithmetic happens.
+       1. Strip and record an optional leading +/- sign.
+       2. Split on '.' into an integer-digit string and a fractional-digit string
+          (at most one decimal point allowed; a bare "." or a trailing "." is rejected).
+       3. Check each remaining character's digitValue() is both a real digit AND less
+          than `base` — e.g. '2' is invalid in base 2, 'g' is invalid in base 16 — so
+          every downstream function can assume its digit strings are already clean. */
+  function parseNumberForBase(raw, base, label) {
+    if (raw === null || raw === undefined || raw.trim() === '') {
+      throw new Error('Enter ' + label + '.');
+    }
+    var s = raw.trim().toLowerCase();
+    var neg = false;
+    if (s[0] === '-') { neg = true; s = s.slice(1); }
+    else if (s[0] === '+') { s = s.slice(1); }
+    if (s.length === 0) throw new Error('Enter ' + label + '.');
+
+    var dotCount = (s.match(/\./g) || []).length;
+    if (dotCount > 1) throw new Error('Only one decimal point is allowed in ' + label + '.');
+
+    var parts = s.split('.');
+    var intDigits = parts[0];
+    var fracDigits = parts.length > 1 ? parts[1] : '';
+    if (parts.length > 1 && fracDigits === '') {
+      throw new Error('Enter at least one digit after the decimal point in ' + label + '.');
+    }
+    if (intDigits === '' && fracDigits === '') throw new Error('Enter ' + label + '.');
+    if (intDigits === '') intDigits = '0'; // e.g. ".5" is treated as "0.5"
+
+    function validateChars(str) {
+      for (var i = 0; i < str.length; i++) {
+        var v = digitValue(str[i]);
+        if (v === -1 || v >= base) {
+          throw new Error('"' + str[i].toUpperCase() + '" is not a valid digit in base ' + base + '.');
+        }
+      }
+    }
+    validateChars(intDigits);
+    if (fracDigits) validateChars(fracDigits);
+
+    return { intDigits: intDigits, fracDigits: fracDigits, negative: neg };
+  }
+
+  /* ============== r's / (r&minus;1)'s COMPLEMENT ALGORITHM ==============
+     Given a magnitude N in base `r` with `nInt` integer digits and (optionally)
+     some fractional digits:
+       (r-1)'s complement (the "diminished radix complement") = (r^nInt - r^-m) - N,
+       where m is the number of fractional digits. Computed digit-by-digit with no
+       borrowing at all: every digit d (0 <= d <= r-1) simply becomes (r-1) - d,
+       since each digit position is independent when subtracting from all-(r-1)s —
+       and that independence holds just as well for a fractional digit as for an
+       integer one.
+       r's complement (the "radix complement") = r^nInt - N (taken mod r^nInt, so
+       the complement of 0 is defined as 0 rather than overflowing).
+       Rather than computing that subtraction directly, the standard shortcut —
+       and the one shown step-by-step here — is: r's complement =
+       (r-1)'s complement + 1, adding 1 to the LEAST-SIGNIFICANT digit (the
+       rightmost fractional digit if there is one, otherwise the rightmost integer
+       digit) and rippling any carry leftward exactly like ordinary addition. This
+       is also literally how two's complement (r=2) is formed in real hardware:
+       flip every bit, then add 1.
+
+     Key insight that makes fractions "just work" with the same algorithm: once
+     the sign is stripped off, a decimal point is not a digit — it's only a fixed
+     marker for where to re-read the digit sequence once the math is done. So both
+     complement operations are run on one FLAT digit string (integer digits then
+     fractional digits, concatenated) exactly as they would be on a pure integer,
+     and the point is reinserted afterward at the same position it started at.
+     (Mano's classic example: the 9's complement of 246.32 is 753.67 — complementing
+     "24632" digit-by-digit gives "75367", and the point goes back after 3 digits.)
+
+     `requestedIntWidth`, if given, left-pads just the INTEGER part with zeros to
+     that many digits (complements are only meaningful for a fixed digit width,
+     since that width is what r^nInt refers to) and is rejected if it's too narrow
+     to hold N's integer part. The fractional digit count is always exactly what
+     was typed — padding the fraction would change the value being complemented. */
+  function computeComplements(intDigits, fracDigits, base, requestedIntWidth) {
+    var naturalIntWidth = intDigits.length;
+    var nInt = naturalIntWidth;
+    if (requestedIntWidth !== null) {
+      if (requestedIntWidth < naturalIntWidth) {
+        throw new Error('Digit width must be at least ' + naturalIntWidth + ' to hold the integer part of ' + upper(intDigits) + ' in base ' + base + '.');
+      }
+      nInt = requestedIntWidth;
+    }
+    var paddedInt = intDigits.padStart(nInt, '0');
+    var fracLen = fracDigits.length;
+    var fullDigits = paddedInt + fracDigits; // flat sequence; the point belongs after index nInt
+    var rMinus1 = base - 1;
+
+    // (r-1)'s complement: subtract every digit from (r-1) independently — no borrowing,
+    // and no special handling needed at the position where the point will go back in.
+    var diminishedFlat = '';
+    var diminishedRows = [];
+    for (var i = 0; i < fullDigits.length; i++) {
+      var d = digitValue(fullDigits[i]);
+      var c = rMinus1 - d;
+      diminishedFlat += DIGITS[c];
+      diminishedRows.push({ original: fullDigits[i], value: d, complementValue: c, complementDigit: DIGITS[c], isFrac: i >= nInt });
+    }
+
+    // r's complement: add 1 to the rightmost digit of the flat sequence, propagating
+    // carry leftward — straight through where the decimal point sits, since it isn't
+    // a digit and doesn't interrupt the ripple. If the carry runs off the far left
+    // (only possible when N = 0), it's simply dropped: the fixed digit width means
+    // the true result wraps around to 0.
+    var radixArr = diminishedFlat.split('');
+    var carryRows = [];
+    var carry = 1;
+    for (var i = radixArr.length - 1; i >= 0 && carry > 0; i--) {
+      var dv = digitValue(radixArr[i]);
+      var sum = dv + carry;
+      if (sum >= base) { radixArr[i] = DIGITS[sum - base]; carry = 1; }
+      else { radixArr[i] = DIGITS[sum]; carry = 0; }
+      carryRows.push({ position: i, before: dv, sum: sum, resultDigit: radixArr[i], carryOut: carry, isFrac: i >= nInt });
+    }
+    var radixFlat = radixArr.join('');
+
+    // Re-insert the decimal point at the same fixed position (after nInt digits)
+    // in a flat digit string, or return it unchanged if there's no fractional part.
+    function withPoint(flat) {
+      return fracLen > 0 ? (flat.slice(0, nInt) + '.' + flat.slice(nInt)) : flat;
+    }
+
+    return {
+      nInt: nInt, naturalIntWidth: naturalIntWidth, fracLen: fracLen, rMinus1: rMinus1,
+      paddedDisplay: withPoint(fullDigits),
+      diminishedDigits: withPoint(diminishedFlat), diminishedRows: diminishedRows,
+      radixDigits: withPoint(radixFlat), carryRows: carryRows, overflowCarry: carry
+    };
+  }
+
+  /* ALGORITHM 1 — POSITIONAL EXPANSION (any base -> decimal)
+     Converts a whole-digit string (no sign, no decimal point) in `base` into its exact
+     decimal value. This is the textbook definition of positional notation: the digit
+     at position i (counting from the right, starting at 0) contributes digit * base^i.
+     Example: "101" in base 2 -> 1*2^2 + 0*2^1 + 1*2^0 = 4 + 0 + 1 = 5.
+     Also used for a *fractional* digit string by the caller — reading "101" as an
+     integer here (=5) is exactly the numerator needed when that string instead
+     represents .101, since the positional weights differ only by the denominator
+     the caller divides by afterward (see analyzeNumber below).
+     Returns the total plus each individual {digit, power, term} for the step display. */
+  function baseToDecimalSteps(digitsStr, base) {
+    var n = digitsStr.length;
+    var B = BigInt(base);
+    var total = 0n;
+    var terms = [];
+    for (var i = 0; i < n; i++) {
+      var ch = digitsStr[i];
+      var power = n - 1 - i;                       // leftmost digit has the highest power
+      var dv = digitValue(ch);
+      var term = BigInt(dv) * (B ** BigInt(power)); // digit * base^power
+      total += term;
+      terms.push({ digit: ch, power: power, dv: dv, term: term });
+    }
+    return { total: total, terms: terms };
+  }
+
+  /* ALGORITHM 2 — REPEATED DIVISION (decimal -> any base, whole-number part)
+     Converts a non-negative decimal BigInt into its digit string in `base`.
+     Classic "divide by the base, keep the remainder" method: at each step the
+     remainder (0..base-1) is the next digit, least-significant first, and the
+     quotient carries forward into the next division. Once the quotient reaches 0,
+     every digit has been produced — read them back most-significant-first, i.e.
+     the reverse of the order they were generated in.
+     Example (13 -> base 2): 13/2=6 r1, 6/2=3 r0, 3/2=1 r1, 1/2=0 r1 -> read
+     bottom-up: 1101. */
+  function decimalToBaseSteps(decVal, base) {
+    var B = BigInt(base);
+    if (decVal === 0n) return { digits: '0', steps: [] };
+    var q = decVal;
+    var steps = [];
+    while (q > 0n) {
+      var rem = q % B;   // next digit
+      var nq = q / B;    // carried into the next iteration
+      steps.push({ quotient: q, remainder: rem, newQuotient: nq, digit: DIGITS[Number(rem)] });
+      q = nq;
+    }
+    var digits = steps.map(function (s) { return s.digit; }).reverse().join('');
+    return { digits: digits, steps: steps };
+  }
+
+  /* ALGORITHM 3 — REPEATED MULTIPLICATION (decimal -> any base, fractional part)
+     Converts an exact fraction num/den (with 0 <= num < den, i.e. a value strictly
+     between 0 and 1) into its fractional digit string in `base`. Mirror image of
+     repeated division: at each step, multiply the fraction by the target base —
+     the whole-number part of that product is the next digit (most-significant
+     first this time, no reversal needed), and whatever's left over after removing
+     that whole part becomes the fraction to multiply again on the next pass.
+     Because num/den is tracked as an exact BigInt ratio rather than a floating-
+     point number, every step is exact — no rounding error can creep in.
+     The loop stops either when the remainder hits exactly 0 (the value terminates
+     in this base, e.g. 0.5 in base 2 is exactly .1) or after `maxDigits` steps,
+     in which case `terminated` comes back false and the caller marks the result
+     as truncated (needed for values like 1/3, which repeat forever in base 10). */
+  function fractionMulSteps(num, den, base, maxDigits) {
+    var n = num;
+    var B = BigInt(base);
+    var steps = [];
+    var digits = '';
+    for (var i = 0; i < maxDigits && n > 0n; i++) {
+      var product = n * B;
+      var digit = product / den;   // whole part of (fraction * base) -> next digit
+      var rem = product % den;     // leftover fraction, carried into the next iteration
+      steps.push({ numBefore: n, den: den, product: product, digit: digit, rem: rem });
+      digits += DIGITS[Number(digit)];
+      n = rem;
+    }
+    return { digits: digits, steps: steps, terminated: n === 0n };
+  }
+
+  /* Takes a fully parsed {intDigits, fracDigits} number in `base` and reduces it to a
+     single EXACT UNSIGNED RATIONAL (unsignedNum / unsignedDen) — this is the pivot
+     point where "digits in some base" becomes "one universal number" that every
+     other function (conversion, addition, division, ...) can operate on identically,
+     regardless of what base it originally came from.
+
+     How the fractional part becomes a fraction: reading the fractional digit string
+     as if it were a plain integer (via baseToDecimalSteps) gives a numerator, and
+     base^(number of fractional digits) gives the matching denominator — e.g. ".101"
+     in base 2 has fracDigits "101" -> numerator 5, denominator 2^3 = 8, i.e. 5/8.
+
+     The whole number is then folded into an improper fraction over that same
+     denominator: unsignedNum = intPart * fracDen + fracNum, unsignedDen = fracDen.
+     Example: "5.101" in base 2 -> int part 5, fraction 5/8 -> (5*8 + 5)/8 = 45/8.
+     Sign is deliberately left out here (see toRational) so this function only ever
+     has to reason about magnitude. */
+  function analyzeNumber(parsed, base) {
+    var intExp = baseToDecimalSteps(parsed.intDigits, base);
+    var fracLen = parsed.fracDigits.length;
+    var fracExpTerms = [];
+    var fracNum = 0n, fracDen = 1n;
+    if (fracLen > 0) {
+      var B = BigInt(base);
+      for (var j = 0; j < fracLen; j++) {
+        var ch = parsed.fracDigits[j];
+        fracExpTerms.push({ digit: ch, power: -(j + 1), dv: digitValue(ch) }); // negative-exponent terms for display
+      }
+      fracNum = baseToDecimalSteps(parsed.fracDigits, base).total;
+      fracDen = B ** BigInt(fracLen);
+    }
+    var allTerms = intExp.terms.concat(fracExpTerms);
+    var unsignedNum = intExp.total * fracDen + fracNum;
+    var unsignedDen = fracDen;
+    return {
+      intExp: intExp, fracExpTerms: fracExpTerms, allTerms: allTerms,
+      fracNum: fracNum, fracDen: fracDen,
+      unsignedNum: unsignedNum, unsignedDen: unsignedDen
+    };
+  }
+
+  // Wraps analyzeNumber() and applies the sign the user typed, then reduces to lowest
+  // terms. The result is the canonical signed rational the arithmetic module operates
+  // on directly for +, -, *, / — see runArith() below.
+  function toRational(parsed, base) {
+    var a = analyzeNumber(parsed, base);
+    var num = (parsed.negative && a.unsignedNum !== 0n) ? -a.unsignedNum : a.unsignedNum;
+    return reduceFrac(num, a.unsignedDen);
+  }
+
+  // Renders a signed rational {num, den} as a human-readable base-10 decimal string
+  // (e.g. "20.5" or "-3.333…"), splitting it into a whole part (plain integer
+  // division) and a fractional remainder run through fractionMulSteps with base 10.
+  // Used only for the "decimal equivalent" line shown to the user, not for any
+  // further computation.
+  function rationalDisplay(r) {
+    var neg = r.num < 0n;
+    var absNum = bigAbs(r.num);
+    var intPart = absNum / r.den;
+    var remNum = absNum % r.den;
+    var frac = remNum > 0n ? fractionMulSteps(remNum, r.den, 10, MAX_FRAC_DIGITS) : null;
+    return (neg ? '-' : '') + fmtInt(intPart) + (frac ? '.' + frac.digits + (!frac.terminated ? '\u2026' : '') : '');
+  }
+
+  /* ============== RENDER HELPERS ============== */
+  function el(html) {
+    var d = document.createElement('div');
+    d.innerHTML = html;
+    return d.firstElementChild;
+  }
+
+  function renderExpansionExpr(terms, base) {
+    var parts = terms.map(function (t) {
+      return upper(t.digit) + '&middot;' + base + toSuperSigned(t.power);
+    });
+    return parts.join(' + ');
+  }
+
+  /* Positional-expansion line: "d·b^i + ... = decimalValue" (or null if base is already 10). */
+  function renderExpansionLine(analysis, base) {
+    if (base === 10) return null;
+    var expr = renderExpansionExpr(analysis.allTerms, base);
+    var decFrac = analysis.fracDen > 1n ? fractionMulSteps(analysis.fracNum, analysis.fracDen, 10, MAX_FRAC_DIGITS) : null;
+    var decStr = fmtInt(analysis.intExp.total) + (decFrac ? '.' + decFrac.digits + (!decFrac.terminated ? '\u2026' : '') : '');
+    return expr + ' <span class="eq">=</span> ' + decStr;
+  }
+
+  function renderDivisionTable(steps, base) {
+    if (!steps.length) return '';
+    var rows = steps.map(function (s) {
+      return '<tr><td>' + fmtInt(s.quotient) + ' &divide; ' + base + '</td>' +
+        '<td>' + fmtInt(s.newQuotient) + '</td>' +
+        '<td class="digit-cell">' + fmtInt(s.remainder) + ' &rarr; \'' + upper(s.digit) + '\'</td></tr>';
+    }).join('');
+    return '<table class="division"><tr><th>Division</th><th>Quotient</th><th>Remainder &rarr; digit</th></tr>' + rows + '</table>';
+  }
+
+  function fracLabel(num, den) {
+    return den === 1n ? fmtInt(num) : (fmtInt(num) + '/' + fmtInt(den));
+  }
+
+  function renderMultiplicationTable(steps, base) {
+    if (!steps.length) return '';
+    var rows = steps.map(function (s) {
+      return '<tr><td>' + fracLabel(s.numBefore, s.den) + ' &times; ' + base + '</td>' +
+        '<td>' + fracLabel(s.product, s.den) + '</td>' +
+        '<td class="digit-cell">' + fmtInt(s.digit) + ' &rarr; \'' + upper(DIGITS[Number(s.digit)]) + '\'</td></tr>';
+    }).join('');
+    return '<table class="division"><tr><th>Fraction &times; base</th><th>Product</th><th>Whole part &rarr; digit</th></tr>' + rows + '</table>';
+  }
+
+  /* Converts a non-negative exact rational (unsignedNum/unsignedDen) into its digit
+     string in `targetBase` — this is where Algorithm 2 (repeated division) and
+     Algorithm 3 (repeated multiplication) actually get applied together to produce
+     a full "whole.fraction" result:
+       1. Split the rational into a whole part (plain BigInt division) and a
+          fractional remainder (unsignedNum mod unsignedDen), still exact.
+       2. Run the whole part through decimalToBaseSteps (repeated division).
+       3. Run the fractional remainder through fractionMulSteps (repeated
+          multiplication), capped at MAX_FRAC_DIGITS.
+     (The rest of the function below assembles the HTML tables for the step
+     breakdown from those two results — display only, not additional computation.) */
+  function renderConversionTables(unsignedNum, unsignedDen, targetBase) {
+    var intPart = unsignedNum / unsignedDen;
+    var remNum = unsignedNum % unsignedDen;
+    var intSteps = decimalToBaseSteps(intPart, targetBase);
+    var fracRes = remNum > 0n ? fractionMulSteps(remNum, unsignedDen, targetBase, MAX_FRAC_DIGITS) : { digits: '', steps: [], terminated: true };
+
+    var htmlOut = renderDivisionTable(intSteps.steps, targetBase);
+    if (!intSteps.steps.length) htmlOut += '<div class="readup">Whole-number part is 0.</div>';
+    else htmlOut += '<div class="readup">Reading the whole-number remainders bottom to top gives those digits.</div>';
+
+    if (fracRes.steps.length) {
+      htmlOut += renderMultiplicationTable(fracRes.steps, targetBase);
+      htmlOut += '<div class="readup">Reading the whole-number part of each product top to bottom gives the fractional digits' +
+        (!fracRes.terminated ? ' (truncated after ' + MAX_FRAC_DIGITS + ' digits &mdash; the expansion continues)' : '') + '.</div>';
+    }
+
+    var digitsStr = upper(intSteps.digits) + (fracRes.digits ? '.' + upper(fracRes.digits) + (!fracRes.terminated ? '\u2026' : '') : '');
+    return { html: htmlOut, digitsStr: digitsStr, intSteps: intSteps, fracRes: fracRes, intPart: intPart, remNum: remNum };
+  }
+
+  function stepEl(n, title, bodyHtml) {
+    var s = document.createElement('li');
+    s.className = 'step';
+    s.setAttribute('data-n', n);
+    s.innerHTML = '<div class="step-title">' + title + '</div><div class="step-body">' + bodyHtml + '</div>';
+    return s;
+  }
+
+  // One row per digit: original digit -> (r-1) - digit -> complement digit.
+  function renderDiminishedTable(rows, rMinus1) {
+    var head = '<tr><th>Digit</th><th>(' + rMinus1 + ') &minus; digit</th><th>Complement digit</th></tr>';
+    var body = rows.map(function (row) {
+      return '<tr><td>' + upper(row.original) + '</td><td>' + rMinus1 + ' &minus; ' + row.value + ' = ' + row.complementValue +
+        '</td><td class="digit-cell">' + upper(row.complementDigit) + '</td></tr>';
+    }).join('');
+    return '<table class="division">' + head + body + '</table>';
+  }
+
+  // One row per digit actually touched by the +1 carry ripple, read right to left.
+  function renderCarryTable(rows, base) {
+    if (!rows.length) {
+      return '<div class="readup">The least-significant digit absorbs the +1 with no carry needed.</div>';
+    }
+    var head = '<tr><th>Step</th><th>Digit + carry</th><th>Result</th></tr>';
+    var body = rows.map(function (row, idx) {
+      return '<tr><td>' + (idx + 1) + ' (from the right)</td><td>' + row.before + ' + 1 = ' + row.sum + '</td>' +
+        '<td class="digit-cell">' + row.resultDigit + (row.carryOut ? ' &nbsp;(carry 1 &rarr;)' : '') + '</td></tr>';
+    }).join('');
+    return '<table class="division">' + head + body + '</table>';
+  }
+
+  /* ============== CONVERSION FLOW ============== */
+  /* Top-level entry point for the Radix Converter tab. Chains the whole pipeline:
+       raw text  --parseNumberForBase-->  validated {intDigits, fracDigits, negative}
+                 --analyzeNumber-------->  exact unsigned rational in the SOURCE base
+                 --reduceFrac----------->  same rational, lowest terms
+                 --renderConversionTables->  digit string in the TARGET base
+     and finally re-applies the sign that was stripped off in parseNumberForBase
+     (renderConversionTables only ever deals in non-negative magnitudes). */
+  function convertNumber(rawNumber, srcBase, tgtBase) {
+    var parsed = parseNumberForBase(rawNumber, srcBase, 'a number to convert');
+    var analysis = analyzeNumber(parsed, srcBase);
+    var reduced = reduceFrac(analysis.unsignedNum, analysis.unsignedDen);
+    var conv = renderConversionTables(reduced.num, reduced.den, tgtBase);
+    var resultDigits = (parsed.negative && reduced.num !== 0n ? '-' : '') + conv.digitsStr;
+    return { parsed: parsed, srcBase: srcBase, tgtBase: tgtBase, analysis: analysis, conv: conv, resultDigits: resultDigits };
+  }
+
+  function buildConversionStepsList(res, stepStart) {
+    var list = document.createElement('ol');
+    list.className = 'step-list';
+    var n = stepStart || 1;
+    var hasFrac = res.parsed.fracDigits.length > 0;
+
+    if (res.srcBase === 10) {
+      var val = res.parsed.intDigits + (hasFrac ? ('.' + res.parsed.fracDigits) : '');
+      list.appendChild(stepEl(n++, 'Source is already base 10',
+        '<div class="expr">value = ' + val + '</div>'));
+    } else {
+      var line = renderExpansionLine(res.analysis, res.srcBase);
+      var desc = hasFrac
+        ? 'Multiply each digit by the base raised to its position &mdash; fractional digits use negative exponents &mdash; then sum.'
+        : 'Multiply each digit by the base raised to its position, then sum.';
+      list.appendChild(stepEl(n++, 'Expand base ' + res.srcBase + ' into base 10 (positional notation)',
+        desc + '<div class="expr">' + line + '</div>'));
+    }
+
+    if (res.tgtBase === 10) {
+      list.appendChild(stepEl(n++, 'Target is base 10 &mdash; no further conversion needed',
+        '<div class="expr">result = ' + res.conv.digitsStr + '</div>'));
+    } else {
+      var hasFracOut = res.conv.fracRes.steps.length > 0;
+      var body = hasFracOut
+        ? 'Convert the whole-number part by dividing repeatedly by ' + res.tgtBase + ', and the fractional part by multiplying repeatedly by ' + res.tgtBase + '.'
+        : 'Divide the decimal value by ' + res.tgtBase + ' repeatedly, recording each remainder as a digit, until the quotient reaches 0.';
+      body += res.conv.html;
+      list.appendChild(stepEl(n++, 'Convert base 10 into base ' + res.tgtBase +
+        (hasFracOut ? ' (division for the whole part, multiplication for the fraction)' : ' by repeated division'), body));
+    }
+    return { list: list, next: n };
+  }
+
+  /* ============== CONVERTER UI WIRING ============== */
+  var convertForm = document.getElementById('convertForm');
+  var convertError = document.getElementById('convertError');
+  var convertResult = document.getElementById('convertResult');
+  var convertResultValue = document.getElementById('convertResultValue');
+  var convertSteps = document.getElementById('convertSteps');
+
+  function showError(box, msg) { box.textContent = msg; box.hidden = false; }
+  function hideError(box) { box.hidden = true; box.textContent = ''; }
+
+/* Main Functions */
+
+  function runConvert() {
+    hideError(convertError);
+    convertResult.hidden = true;
+    convertSteps.innerHTML = '';
+    try {
+      var srcBase = validateBase(document.getElementById('srcBase').value, 'Source base');
+      var tgtBase = validateBase(document.getElementById('tgtBase').value, 'Target base');
+      var raw = document.getElementById('srcNumber').value;
+      var res = convertNumber(raw, srcBase, tgtBase);
+
+      convertResultValue.innerHTML = res.resultDigits + '<span class="base-tag">base ' + tgtBase + '</span>';
+      convertResult.hidden = false;
+
+      var heading = el('<div class="steps-heading">STEP-BY-STEP BREAKDOWN</div>');
+      convertSteps.appendChild(heading);
+      var built = buildConversionStepsList(res, 1);
+      convertSteps.appendChild(built.list);
+
+      var srcDisplay = (res.parsed.negative ? '-' : '') + upper(res.parsed.intDigits) +
+        (res.parsed.fracDigits ? '.' + upper(res.parsed.fracDigits) : '');
+      var finalLine = el('<div class="final-line">' +
+        srcDisplay + ' (base ' + srcBase + ') = ' +
+        res.resultDigits + ' (base ' + tgtBase + ')</div>');
+      convertSteps.appendChild(finalLine);
+    } catch (err) {
+      showError(convertError, err.message);
+    }
+  }
+  convertForm.addEventListener('submit', function (e) { e.preventDefault(); runConvert(); });
+
+  /* ============== ARITHMETIC FLOW ============== */
+  /* Top-level entry point for the Mixed Radix Operations tab. Overall shape:
+       1. Parse & validate both operands (each in its own base, each may have a
+          fractional part).
+       2. BASE NORMALIZATION RULE: bTarget = max(b1, b2). Whichever operand has
+          the lower base gets converted up to bTarget (purely for display/exactness
+          bookkeeping — see note on r1/r2 below for why the arithmetic itself
+          doesn't actually need this step).
+       3. Turn both operands into exact signed rationals (r1, r2) and combine them
+          with the chosen operator using plain schoolbook fraction arithmetic.
+       4. Convert the resulting rational back into digits in bTarget for display. */
+  function runArith() {
+    hideError(arithError);
+    arithResult.hidden = true;
+    arithSteps.innerHTML = '';
+    try {
+      var b1 = validateBase(document.getElementById('b1').value, 'Base of N1');
+      var b2 = validateBase(document.getElementById('b2').value, 'Base of N2');
+      var op = document.getElementById('operator').value;
+      var raw1 = document.getElementById('n1').value;
+      var raw2 = document.getElementById('n2').value;
+
+      var p1 = parseNumberForBase(raw1, b1, 'the first number (N1)');
+      var p2 = parseNumberForBase(raw2, b2, 'the second number (N2)');
+
+      // Base Normalization Rule: the shared/target base for the result is whichever
+      // of the two input bases is larger; `lower` records which operand (1 or 2,
+      // 0 if they already match) needs to be re-expressed in that base for the step
+      // breakdown.
+      var bTarget = Math.max(b1, b2);
+      var lower = b1 < b2 ? 1 : (b2 < b1 ? 2 : 0);
+
+      // analyzeNumber() reduces each operand to an exact rational value REGARDLESS
+      // of its base (see analyzeNumber's own comment) — so, mathematically, r1 and
+      // r2 already fully capture both numbers' true values and the operator below
+      // can combine them directly. The "normalization" step built further down is
+      // there to *show the base-matching work explicitly*, as the module's
+      // step-by-step spec calls for, but the actual arithmetic never depends on it.
+      var a1 = analyzeNumber(p1, b1);
+      var a2 = analyzeNumber(p2, b2);
+      var r1 = reduceFrac((p1.negative && a1.unsignedNum !== 0n) ? -a1.unsignedNum : a1.unsignedNum, a1.unsignedDen);
+      var r2 = reduceFrac((p2.negative && a2.unsignedNum !== 0n) ? -a2.unsignedNum : a2.unsignedNum, a2.unsignedDen);
+
+      var list = document.createElement('ol');
+      list.className = 'step-list';
+      var n = 1;
+
+      var disp1 = (p1.negative ? '-' : '') + upper(p1.intDigits) + (p1.fracDigits ? ('.' + upper(p1.fracDigits)) : '');
+      var disp2 = (p2.negative ? '-' : '') + upper(p2.intDigits) + (p2.fracDigits ? ('.' + upper(p2.fracDigits)) : '');
+
+      list.appendChild(stepEl(n++, 'State the initial values and bases',
+        '<div class="expr">N1 = ' + disp1 + ', base ' + b1 +
+        ' &nbsp;&middot;&nbsp; N2 = ' + disp2 + ', base ' + b2 + '</div>'));
+
+      var norm1Str = upper(p1.intDigits) + (p1.fracDigits ? ('.' + upper(p1.fracDigits)) : '');
+      var norm2Str = upper(p2.intDigits) + (p2.fracDigits ? ('.' + upper(p2.fracDigits)) : '');
+
+      if (b1 === b2) {
+        list.appendChild(stepEl(n++, 'Bases already match &mdash; no normalization needed',
+          'Both numbers are already in base ' + bTarget + ', so arithmetic can proceed directly.'));
+      } else {
+        var lowerLabel = lower === 1 ? 'N1' : 'N2';
+        var lowerBase = lower === 1 ? b1 : b2;
+        var lowerAnalysis = lower === 1 ? a1 : a2;
+        var lowerParsed = lower === 1 ? p1 : p2;
+
+        var body = 'Bases differ (' + b1 + ' vs ' + b2 + '). The target base is the higher of the two: base ' + bTarget + '. ' +
+          lowerLabel + ' is in the lower base (' + lowerBase + ') and must be converted up to base ' + bTarget + '.';
+
+        var line = renderExpansionLine(lowerAnalysis, lowerBase);
+        if (line) body += '<div class="expr">' + line + '</div>';
+
+        var normConv = renderConversionTables(lowerAnalysis.unsignedNum, lowerAnalysis.unsignedDen, bTarget);
+        body += normConv.html;
+        var normDigitsStr = (lowerParsed.negative && lowerAnalysis.unsignedNum !== 0n ? '-' : '') + normConv.digitsStr;
+        body += '<div class="readup">' + lowerLabel + ' normalized = ' + normDigitsStr + ' (base ' + bTarget + ')</div>';
+
+        list.appendChild(stepEl(n++, 'Normalize the lower-base number up to base ' + bTarget, body));
+
+        if (lower === 1) norm1Str = normDigitsStr; else norm2Str = normDigitsStr;
+      }
+
+      var opSymbol = { '+': '+', '-': '\u2212', '*': '\u00d7', '/': '\u00f7' }[op];
+      var opWord = { '+': 'Add', '-': 'Subtract', '*': 'Multiply', '/': 'Divide' }[op];
+
+      // A rational's value is zero exactly when its (reduced) numerator is zero,
+      // regardless of the denominator — this is the one check needed to catch
+      // division by zero, including "zero" written with a fractional part like ".0".
+      if (op === '/' && r2.num === 0n) {
+        throw new Error('Cannot divide by zero.');
+      }
+
+      // Standard schoolbook fraction arithmetic on r1 = r1.num/r1.den and
+      // r2 = r2.num/r2.den, all exact because every value involved is a BigInt:
+      //   addition/subtraction : cross-multiply onto a common denominator
+      //                           (a/b) ± (c/d) = (a*d ± c*b) / (b*d)
+      //   multiplication        : multiply straight across
+      //                           (a/b) * (c/d) = (a*c) / (b*d)
+      //   division               : multiply by the reciprocal of the divisor
+      //                           (a/b) / (c/d) = (a*d) / (b*c)
+      // reduceFrac() then brings the result back to lowest terms. Because this
+      // works on the divisor's numerator/denominator directly rather than rounding
+      // to an integer quotient, dividing two whole numbers that don't divide evenly
+      // (e.g. 5 ÷ 2) now yields the exact fractional result (2.5) instead of a
+      // truncated integer quotient-and-remainder.
+      var resultRational;
+      if (op === '+') resultRational = reduceFrac(r1.num * r2.den + r2.num * r1.den, r1.den * r2.den);
+      else if (op === '-') resultRational = reduceFrac(r1.num * r2.den - r2.num * r1.den, r1.den * r2.den);
+      else if (op === '*') resultRational = reduceFrac(r1.num * r2.num, r1.den * r2.den);
+      else resultRational = reduceFrac(r1.num * r2.den, r1.den * r2.num);
+
+      var opBody = 'With both operands in base ' + bTarget + ' (N1&prime; = ' + norm1Str + ', N2&prime; = ' + norm2Str +
+        '), convert each to an exact decimal value and apply the operator: <div class="expr">' +
+        rationalDisplay(r1) + ' ' + opSymbol + ' ' + rationalDisplay(r2) + ' <span class="eq">=</span> ' +
+        rationalDisplay(resultRational) + ' (base 10)</div>';
+      list.appendChild(stepEl(n++, opWord + ' the two values in base ' + bTarget, opBody));
+
+      var finalConv = renderConversionTables(bigAbs(resultRational.num), resultRational.den, bTarget);
+      var resultDigits = (resultRational.num < 0n ? '-' : '') + finalConv.digitsStr;
+      var hasFracOut = finalConv.fracRes.steps.length > 0;
+      var backBody = 'Convert the decimal result back into base ' + bTarget +
+        (hasFracOut ? ' (division for the whole part, multiplication for the fraction)' : ' by repeated division') + '.';
+      backBody += finalConv.html;
+      list.appendChild(stepEl(n++, 'Convert the result back into base ' + bTarget, backBody));
+
+      arithSteps.innerHTML = '';
+      var heading = el('<div class="steps-heading">STEP-BY-STEP BREAKDOWN</div>');
+      arithSteps.appendChild(heading);
+      arithSteps.appendChild(list);
+      var finalLine = el('<div class="final-line">' + disp1 + ' (base ' + b1 + ') ' + opSymbol + ' ' +
+        disp2 + ' (base ' + b2 + ') = ' + resultDigits + ' (base ' + bTarget + ')</div>');
+      arithSteps.appendChild(finalLine);
+
+      arithResultValue.innerHTML = resultDigits + '<span class="base-tag">base ' + bTarget + '</span>';
+      arithResultSub.innerHTML = 'decimal equivalent: ' + rationalDisplay(resultRational);
+      arithResult.hidden = false;
+    } catch (err) {
+      showError(arithError, err.message);
+    }
+  }
+
+  var arithForm = document.getElementById('arithForm');
+  var arithError = document.getElementById('arithError');
+  var arithResult = document.getElementById('arithResult');
+  var arithResultValue = document.getElementById('arithResultValue');
+  var arithResultSub = document.getElementById('arithResultSub');
+  var arithSteps = document.getElementById('arithSteps');
+  arithForm.addEventListener('submit', function (e) { e.preventDefault(); runArith(); });
+
+  /* ============== COMPLEMENT FLOW ============== */
+  /* Builds the three-step explanation for computeComplements()'s result:
+       1. state N and the (possibly padded) integer digit width,
+       2. the digit-by-digit (r-1)'s complement (flat across the decimal point),
+       3. the +1-with-carry step that turns that into the r's complement. */
+  function buildComplementSteps(res, parsed, base) {
+    var list = document.createElement('ol');
+    list.className = 'step-list';
+    var n = 1;
+    var hasFrac = res.fracLen > 0;
+
+    var rawDisplay = upper(parsed.intDigits) + (hasFrac ? '.' + upper(parsed.fracDigits) : '');
+    var digitCountNote = res.nInt + ' integer digit' + (res.nInt === 1 ? '' : 's') +
+      (hasFrac ? ' + ' + res.fracLen + ' fractional digit' + (res.fracLen === 1 ? '' : 's') : '');
+    var paddingBody = (res.nInt === res.naturalIntWidth)
+      ? '<div class="expr">N = ' + upper(res.paddedDisplay) + ' (base ' + base + '), ' + digitCountNote + '</div>'
+      : '<div class="expr">N = ' + rawDisplay + ' &rarr; integer part padded to ' + res.nInt + ' digits &rarr; ' + upper(res.paddedDisplay) + ' (base ' + base + ')</div>';
+    list.appendChild(stepEl(n++, 'State the number and digit width', paddingBody));
+
+    var diminBody = 'Subtract each digit from (base &minus; 1) = ' + res.rMinus1 +
+      '. Every digit is already between 0 and ' + res.rMinus1 + ', so this never needs borrowing' +
+      (hasFrac ? ', and the decimal point stays fixed in place &mdash; digits on either side are complemented the same way.' : '.');
+    diminBody += renderDiminishedTable(res.diminishedRows, res.rMinus1);
+    diminBody += '<div class="readup">(' + res.rMinus1 + ")'s complement = " + upper(res.diminishedDigits) + '</div>';
+    list.appendChild(stepEl(n++, "Compute the (" + res.rMinus1 + ")'s complement (diminished radix complement)", diminBody));
+
+    var radixBody = 'Add 1 to the least-significant digit' + (hasFrac ? ' (the rightmost fractional digit)' : '') +
+      ' of the (' + res.rMinus1 + ")'s complement, rippling any carry leftward" +
+      (hasFrac ? ' &mdash; straight through the decimal point, which isn\u2019t a digit and doesn\u2019t interrupt the ripple.' : '.');
+    radixBody += renderCarryTable(res.carryRows, base);
+    if (res.overflowCarry) {
+      radixBody += '<div class="readup">The final carry runs off the left end and is discarded &mdash; the result wraps within the fixed digit width (expected when N = 0).</div>';
+    }
+    radixBody += '<div class="readup">' + base + "'s complement = " + upper(res.radixDigits) + '</div>';
+    list.appendChild(stepEl(n++, 'Compute the ' + base + "'s complement (radix complement) = (" + res.rMinus1 + "'s complement) + 1", radixBody));
+
+    return list;
+  }
+
+  var complForm = document.getElementById('complForm');
+  var complError = document.getElementById('complError');
+  var complResult = document.getElementById('complResult');
+  var complDiminishedValue = document.getElementById('complDiminishedValue');
+  var complDiminishedSub = document.getElementById('complDiminishedSub');
+  var complRadixValue = document.getElementById('complRadixValue');
+  var complRadixSub = document.getElementById('complRadixSub');
+  var complSteps = document.getElementById('complSteps');
+
+  function runComplements() {
+    hideError(complError);
+    complResult.hidden = true;
+    complSteps.innerHTML = '';
+    try {
+      var base = validateBase(document.getElementById('complBase').value, 'Base');
+      // Reuse the same parser the other two tabs use (so fractions, and their
+      // validation, work identically here) — complements just additionally
+      // require a non-negative magnitude, since a sign has no independent
+      // meaning for a value whose whole purpose is to represent "negative".
+      var parsed = parseNumberForBase(document.getElementById('complNumber').value, base, 'the number');
+      if (parsed.negative) {
+        throw new Error('The number must be non-negative \u2014 complements apply to magnitudes, not signed values.');
+      }
+
+      var widthRaw = document.getElementById('complWidth').value;
+      var requestedWidth = null;
+      if (widthRaw !== null && widthRaw.trim() !== '') {
+        var w = Number(widthRaw);
+        if (!Number.isInteger(w) || w < 1) throw new Error('Digit width must be a positive whole number.');
+        requestedWidth = w;
+      }
+
+      var res = computeComplements(parsed.intDigits, parsed.fracDigits, base, requestedWidth);
+
+      complDiminishedValue.innerHTML = upper(res.diminishedDigits) + '<span class="base-tag">base ' + base + '</span>';
+      complDiminishedSub.textContent = 'aka ' + res.rMinus1 + "'s complement in base " + base;
+
+      complRadixValue.innerHTML = upper(res.radixDigits) + '<span class="base-tag">base ' + base + '</span>';
+      complRadixSub.textContent = 'aka ' + base + "'s complement in base " + base;
+
+      complResult.hidden = false;
+
+      var heading = el('<div class="steps-heading">STEP-BY-STEP BREAKDOWN</div>');
+      complSteps.appendChild(heading);
+      complSteps.appendChild(buildComplementSteps(res, parsed, base));
+    } catch (err) {
+      showError(complError, err.message);
+    }
+  }
+  complForm.addEventListener('submit', function (e) { e.preventDefault(); runComplements(); });
+
+  /* ============== INITIAL DEMO STATE ============== */
+  runConvert();
+  runArith();
+  runComplements();
+})();
+</script>
+</body>
+</html>
